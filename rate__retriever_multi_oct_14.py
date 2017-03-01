@@ -1,0 +1,185 @@
+# 151 currencies, 22650 currency pairs, 364 days (period 1) 134 days (period 2) => 3,035,100(20,100/from_c) - 8,221,950 entries(8361.157)
+
+
+print('importing packages')
+import time
+import sqlite3
+import json
+import requests
+import datetime
+import math
+import pytz
+from datetime import date
+from multiprocessing.pool import Pool
+import sys
+
+print('connecting to db')
+conn = sqlite3.connect('mastercard_db.sqlite')
+cur = conn.cursor()
+
+print('defining functions')
+def day_calculator(date):
+    return (date - date_1).days + 1
+def date_calculator(day):
+    return date_1+datetime.timedelta(day-1)
+def date_stringer(date):
+    return date.strftime('%Y-%m-%d')
+def chunkIt(seq, num):
+  avg = len(seq) / float(num)
+  out = []
+  last = 0.0
+
+  while last < len(seq):
+    out.append(seq[int(last):int(last + avg)])
+    last += avg
+
+  return out
+    
+
+print('defining constants')
+start_from_id = int(input('from_id initial value: '))
+start_to_ids= [28]*3+[27]*12
+n = len(start_to_ids)
+
+base_url = 'https://www.mastercard.us/settlement/currencyrate/fxDate={date_};transCurr={from_};crdhldBillCurr={to_};bankFee=0.00;transAmt=1/conversion-rate'
+
+first_date=date(2016,2,29)
+now = datetime.datetime.now(pytz.timezone('US/Eastern'))
+print('now: ', now)
+if now.hour < 14:
+    today=now.date() - datetime.timedelta(days=1)
+else:
+    today=now.date()
+print('today: ', today)    
+date_1=today - datetime.timedelta(days=364)
+if date_1.weekday()==6:
+    date_1=date_1+datetime.timedelta(days=1)
+if date_1.weekday()==5:
+    date_1=date_1+datetime.timedelta(days=2)
+print(date_1)
+
+date_string = date_stringer(date_1)
+print('first date in period', date_1, 'today:',today) 
+late_day=day_calculator(date(2016,10,14))
+
+print('grabbing codes from db')
+cur.execute('SELECT code FROM Currency_Codes')
+code_tuples=cur.fetchall()
+codes = [ x[0] for x in code_tuples ]
+number_of_codes = len(codes)
+
+
+def extract_rates(from_id,to_id):
+    if to_id>151:
+        entry='done'
+        entries.append(entry)
+        return entries
+    if from_id is 'done':
+        entry='done'
+        entries.append(entry)
+        return entries   
+      
+    else:
+        from_c = codes[from_id-1]
+        to_c = codes[to_id-1]
+        print(from_c,to_c)
+        day=late_day
+        date=date_calculator(day) 
+        print('extracting rates...')
+        while (today - date).days >=0:
+            date_string=date_stringer(date)
+            url=base_url.format(date_=date_string,from_=from_c,to_=to_c)
+
+            #Retries if requests doesn't return a json file (server errors)
+            while True:
+                try:
+                    r = requests.get(url)
+                    JSON=r.json()
+                except:
+                    time.sleep(5) 
+                    continue
+                break
+    
+            if 'errorCode' in JSON['data']:
+                if JSON['data']['errorCode'] in ('104','114'):
+                    print('data not available for this date')
+                    day = day + 1
+                    date = date_calculator(day)
+                    continue
+                elif JSON['data']['errorCode'] in ('500','401','400'):
+                    print('error code: ',JSON['data']['errorCode'])
+                    print('Server having technical problems')
+                    time.sleep(500)
+                    continue
+            
+                else:
+                    print('error code: ',JSON['data']['errorCode'])
+                    print('conversion rate too small')
+                    break
+            else:
+                rate = JSON['data']['conversionRate']
+                day = day_calculator(date)     
+                date_id=(date_1-first_date).days+day
+                entry=(rate,from_c,to_c,date_id)
+                entries.append(entry)
+                day+=1
+                date=date_calculator(day)
+        
+        return entries    
+
+
+
+print('initiating')
+entries=list()
+chunks=chunkIt(range(start_from_id,152),n)
+for code in codes[(start_from_id-1):]:
+    try:
+        to_ids
+    except:
+        to_ids = start_to_ids
+        from_ids = [chunks[x][0] for x in range(0,n)]
+        last_from_ids = [chunks[x][-1] for x in range(0,n)]
+    while any(from_ids[x] != 'done' for x in range(0,n)):
+        while all(to_id <=151 for to_id in to_ids):
+            entries.clear()
+            for i in range (0,n): 
+                if from_ids[i] is to_ids[i]:
+                        to_ids[i] +=1
+                        continue
+            for i in range (0,n):        
+                print(from_ids[i],to_ids[i])
+
+            start_time = datetime.datetime.now()     
+            p = Pool(processes=n)
+            entries_list =p.starmap(extract_rates, [(from_ids[x],to_ids[x]) for x in range(0,n) ])
+            p.close()
+            for entries in entries_list:
+                for entry in entries:
+                    if entry == 'done':
+                        pass
+                    else:
+                        cur.execute('''INSERT OR REPLACE INTO Rates
+                        (rate, from_id, to_id, date_id)
+                        VALUES ( ?, ?, ?, ?)''', 
+                        (entry[0], codes.index(entry[1])+1, codes.index(entry[2])+1, entry[3]) )
+                conn.commit()
+                end_time = datetime.datetime.now()
+                print('Duration: {}'.format(end_time - start_time))
+            to_ids[:] = [x+1 for x in to_ids]
+
+            date_1=today - datetime.timedelta(days=364)
+            if date_1.weekday()==6:
+                date_1=date_1+datetime.timedelta(days=1)
+            if date_1.weekday()==5:
+                date_1=date_1+datetime.timedelta(days=2)
+            now = datetime.datetime.now(pytz.timezone('US/Eastern'))
+            if now.hour < 14:
+                today=now.date() - datetime.timedelta(days=1)
+            else:
+                today=now.date()
+
+        from_ids[:] = ['done' if from_ids[x] in ('done',last_from_ids[x]) else from_ids[x]+1  for x in range(0,n)]
+        print (from_ids)
+        to_ids[:] = [1] * n
+  
+
