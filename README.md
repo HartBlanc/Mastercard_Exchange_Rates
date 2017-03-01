@@ -19,7 +19,7 @@ Some information about the exchange rate data:
 
 
 Some information about the scripts:
-
+I have been running this script in python 3.6, and have not included any attempts at backwards compatability.
 One exchange rate is recieved per request.
   
   rate_retriever.py retrieves all rates from 1 year ago to the present day with a single thread.
@@ -31,7 +31,14 @@ The multiple threads work by breaking the data into chunks of equal size and the
  
  rate_retriever_multi_oct_14.py retrieves all rates from October 14th to the present day with multiple threads. This reduces the bottleneck problem substantially and is probably the only viable option for donwloading data from all currencies.
   
- 
- Any suggestions on how to relieve the bottleneck issue would be greatly appreciated, this is my first attempt at using multiprocessing.
+Potential improvements include:
+
+Any suggestions on how to relieve the bottleneck issue would be greatly appreciated, this is my first attempt at using multiprocessing.
+
+Versions compatible with earlier versions of python.
+
+An additional script that evaluates peformance at different thread counts to suggest the optimal level.
+
+(my preliminary tests on my 4-core i5 macbook did well at 15 threads)
   
   
