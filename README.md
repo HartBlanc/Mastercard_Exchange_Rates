@@ -20,6 +20,7 @@ The code could be easily modified to retrieve other data or store in different f
 
 ## Some information about the scripts:
 I have been running this script in python 3.6, and have not included any attempts at backwards compatability.
+
 One exchange rate is recieved per request.
   
 ### rate_retriever.py
