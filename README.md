@@ -23,7 +23,7 @@ Some information about the scripts:
 One exchange rate is recieved per request.
   
   rate_retriever.py retrieves all rates from 1 year ago to the present day with a single thread.
-  It searchs by first looking to see if the rates are available only from October 14th, then the 1st day (where most rates are clustered) then does a binary search within the range. To retrieve all the date this program would be incredibly slow, 30+ days.
+  It searchs by first looking to see if the rates are available only from October 14th, then the 1st day (where most rates are clustered) then does a binary search within the range. To retrieve all the data this program would be incredibly slow, 30+ days.
   
 rate_retriever_multi.py is effectively rate_retriever.py with multiple threads. However, because of the way multiprocessing.pool.starmap works the requests has to wait for all data to be retrieved. Because of the variation in start dates this is a severe bottleneck and the program will still take a very long time to retrieve large volumes of data, although this is the best option if you want data over a long range for a small number of currencies.
 The multiple threads work by breaking the data into chunks of equal size and then processing them individually.  
